@@ -1,0 +1,13 @@
+version: '2.1'
+services:
+  airplay:
+    build: ./airplay
+    restart: always
+    privileged: true
+    volumes:
+      - airplay-metadata:/tmp
+    command: >
+      bash -c "shairport-sync -c /app/shairport-sync.conf & sleep 2 && /app/gpio_relay_airplay.sh"
+
+volumes:
+  airplay-metadata:
