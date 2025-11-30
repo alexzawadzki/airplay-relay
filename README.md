@@ -11,6 +11,9 @@ This project combines Shairport Sync (AirPlay audio receiver) with intelligent G
 - **AirPlay Audio Receiver**: Stream music from iPhone, iPad, Mac, or iTunes
 - **Automatic Relay Control**: Powers devices on/off based on playback state
 - **Smart Turn-off Delay**: Configurable delay (default 10s) prevents rapid cycling when pausing/resuming
+- **Software Volume Control**: Adjust volume directly from iOS/macOS with configurable range
+- **Fully Configurable**: Change GPIO pins, device name, audio settings via environment variables
+- **Password Protection**: Optional password to restrict AirPlay access
 - **Balena Cloud Ready**: Easy deployment, monitoring, and OTA updates
 - **Remote Management**: Configure and monitor from anywhere via Balena dashboard
 - **Multi-Device Support**: Manage fleets of devices from one interface
@@ -166,42 +169,81 @@ If you prefer to deploy without Balena Cloud:
 
 ## Configuration
 
+All settings can be configured via environment variables in the Balena dashboard or `docker-compose.yml`.
+
 ### Environment Variables
 
-Configure the turn-off delay via environment variables:
+#### GPIO Configuration
 
-| Variable          | Default | Description                                    |
-|-------------------|---------|------------------------------------------------|
-| `TURN_OFF_DELAY`  | 10      | Seconds to wait before turning off relay       |
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `GPIO_PIN` | 17 | GPIO pin number using BCM numbering (not physical pin) |
+| `GPIO_ACTIVE_STATE` | 1 | Signal to activate relay: `1` = HIGH, `0` = LOW |
+| `TURN_OFF_DELAY` | 10 | Seconds to wait before turning off relay after playback stops |
 
-#### Change via Balena Dashboard
+#### AirPlay Configuration
 
-1. Go to your application in Balena dashboard
-2. Select your device
-3. Navigate to "Device Variables" or "Service Variables"
-4. Add/Edit: `TURN_OFF_DELAY = 15` (for 15 seconds)
-5. Device will restart automatically with new settings
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `AIRPLAY_NAME` | AirPlay Relay | Device name shown in AirPlay device list |
+| `AIRPLAY_PASSWORD` | _(empty)_ | Optional password for AirPlay access (leave empty for no password) |
 
-#### Change via docker-compose.yml (Manual Deployment)
+#### Audio Configuration
 
-Edit `docker-compose.yml`:
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `AUDIO_BACKEND` | alsa | Audio backend: `alsa`, `pulse`, or `pipe` |
+| `AUDIO_DEVICE` | default | ALSA device name (use `aplay -L` on Pi to list available devices) |
+| `ENABLE_VOLUME_CONTROL` | yes | Enable software volume control: `yes` or `no` |
+| `VOLUME_RANGE` | 60 | Software volume control range in dB (30-60 recommended) |
+
+**Common Audio Devices:**
+- `default` - System default audio output
+- `sysdefault:CARD=Headphones` - 3.5mm headphone jack
+- `sysdefault:CARD=vc4hdmi` - HDMI audio output
+- `hw:0,0` - First hardware device
+
+#### Advanced Configuration
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `INTERPOLATION` | soxr | Audio interpolation quality: `basic` or `soxr` (higher quality) |
+| `METADATA_PIPE` | /tmp/shairport-sync-metadata | Path to metadata pipe for event monitoring |
+
+### Configuring via Balena Dashboard
+
+1. Log in to [Balena Dashboard](https://dashboard.balena-cloud.com/)
+2. Select your application
+3. Click on your device
+4. Navigate to "Device Variables" tab
+5. Click "Add Variable"
+6. Enter variable name and value (e.g., `AIRPLAY_NAME` = `Living Room Speakers`)
+7. Device will restart automatically with new settings
+
+**Examples:**
+
+- **Change device name**: `AIRPLAY_NAME = Kitchen Speakers`
+- **Increase turn-off delay**: `TURN_OFF_DELAY = 30`
+- **Use different GPIO**: `GPIO_PIN = 27`
+- **Add password**: `AIRPLAY_PASSWORD = mysecretpass`
+- **Adjust volume range**: `VOLUME_RANGE = 40`
+
+### Configuring via docker-compose.yml (Manual Deployment)
+
+Edit `docker-compose.yml` and modify the environment section:
 
 ```yaml
 environment:
-  - TURN_OFF_DELAY=15  # Change to desired seconds
+  - GPIO_PIN=27                      # Use GPIO 27 instead of 17
+  - TURN_OFF_DELAY=30                # 30 second delay
+  - AIRPLAY_NAME=Garage Speakers     # Custom name
+  - AIRPLAY_PASSWORD=mypassword      # Add password protection
+  - VOLUME_RANGE=40                  # Quieter max volume
 ```
 
 Then restart:
 ```bash
 docker-compose down && docker-compose up -d
-```
-
-### Change GPIO Pin
-
-To use a different GPIO pin, edit `airplay/gpio_relay_airplay.sh`:
-
-```bash
-GPIO=17  # Change to your desired GPIO number (BCM)
 ```
 
 ## Usage
@@ -211,25 +253,59 @@ GPIO=17  # Change to your desired GPIO number (BCM)
 1. Ensure your device and Raspberry Pi are on the same network
 2. Open Control Center (iOS) or Music/iTunes (macOS)
 3. Tap the AirPlay icon
-4. Select "Shairport Sync" (your Raspberry Pi)
-5. Play music - your amplifier will turn on automatically
-6. Stop playback - amplifier turns off after configured delay
+4. Select your device name (default: "AirPlay Relay")
+5. Enter password if you configured one
+6. Play music - your amplifier will turn on automatically
+7. Use the volume controls on your device to adjust playback volume
+8. Stop playback - amplifier turns off after configured delay
+
+### Volume Control
+
+When `ENABLE_VOLUME_CONTROL=yes` (default), you can control the Raspberry Pi's audio output volume directly from your iOS/macOS device:
+
+- **iOS**: Use volume buttons or Control Center slider
+- **macOS**: Use volume slider in AirPlay menu
+- **Range**: Controlled by `VOLUME_RANGE` setting (default 60dB)
+
+The volume control affects the Pi's audio output, perfect for controlling amplifier input levels.
 
 ### Monitoring (Balena Cloud)
 
 View real-time logs from the Balena dashboard:
 
 ```
-AirPlay GPIO Relay started (GPIO 17, Turn-off delay: 10s)
-AirPlay STARTED
-AirPlay playback ended, scheduling turn-off in 10s...
+=========================================
+AirPlay Relay Configuration
+=========================================
+Device Name: AirPlay Relay
+Audio Backend: alsa
+Audio Device: default
+Volume Control: yes
+Volume Range: 60dB
+Interpolation: soxr
+Metadata Pipe: /tmp/shairport-sync-metadata
+=========================================
+
+=========================================
+GPIO Relay Configuration
+=========================================
+GPIO Pin: 17 (BCM)
+Active State: 1 (HIGH)
+Turn-off Delay: 10s
+Metadata Pipe: /tmp/shairport-sync-metadata
+=========================================
+
+Monitoring AirPlay events...
+
+[2025-11-30 20:15:32] AirPlay STARTED - Relay ON
+[2025-11-30 20:18:45] AirPlay playback ended, scheduling turn-off in 10s...
 AirPlay STOPPED (after 10s delay)
 ```
 
 If music resumes during the delay:
 ```
 Turn-off cancelled (music resumed)
-AirPlay STARTED
+[2025-11-30 20:18:50] AirPlay STARTED - Relay ON
 ```
 
 ### Monitoring (Manual Deployment)
@@ -301,12 +377,34 @@ docker-compose logs airplay
 
 ### Audio quality issues
 
-**Check ALSA configuration:**
+**Check available audio devices:**
 ```bash
-aplay -l  # List audio devices
+aplay -L  # List all audio devices
+aplay -l  # List hardware devices
 ```
 
-Edit `airplay/shairport-sync.conf` to specify audio device if needed.
+**Change audio device via environment variable:**
+Set `AUDIO_DEVICE` to match a device from `aplay -L`. For example:
+- `AUDIO_DEVICE=sysdefault:CARD=Headphones` for 3.5mm jack
+- `AUDIO_DEVICE=sysdefault:CARD=vc4hdmi` for HDMI audio
+
+**Improve audio quality:**
+- Set `INTERPOLATION=soxr` for better quality (default)
+- Increase `VOLUME_RANGE` for more dynamic range
+
+### Volume control not working
+
+**Check volume control is enabled:**
+```bash
+# In Balena dashboard or docker-compose.yml
+ENABLE_VOLUME_CONTROL=yes
+```
+
+**Test ALSA mixer:**
+```bash
+alsamixer  # Should show PCM control
+amixer scontrols  # List available mixer controls
+```
 
 ### Relay stays on after music stops
 
@@ -323,13 +421,24 @@ Edit `airplay/shairport-sync.conf` to specify audio device if needed.
 airplay-relay/
 ├── airplay/
 │   ├── Dockerfile              # Container image definition
-│   ├── gpio_relay_airplay.sh   # GPIO control script
-│   └── shairport-sync.conf     # AirPlay configuration
-├── docker-compose.yml          # Service orchestration
+│   ├── start.sh                # Startup script that generates config and starts services
+│   └── gpio_relay_airplay.sh   # GPIO control script with event monitoring
+├── docker-compose.yml          # Service orchestration with environment variables
 ├── balena.yml                  # Balena Cloud configuration
 ├── .balenaignore               # Files to exclude from builds
 └── README.md                   # This file
 ```
+
+### How It Works
+
+1. **start.sh** reads environment variables and generates `/etc/shairport-sync.conf` dynamically
+2. **Avahi daemon** starts for mDNS/Bonjour service discovery
+3. **shairport-sync** starts as AirPlay receiver with generated config
+4. **gpio_relay_airplay.sh** monitors the metadata pipe for playback events
+5. When `pbeg` (playback begin) event detected → GPIO goes HIGH → Relay activates
+6. When `pend` (playback end) event detected → Starts countdown timer
+7. If countdown completes → GPIO goes LOW → Relay deactivates
+8. If playback resumes during countdown → Timer cancels, relay stays active
 
 ### Local Development
 
@@ -340,17 +449,21 @@ docker-compose build
 # Test the container
 docker-compose up
 
-# View logs
-docker-compose logs -f
+# View logs in real-time
+docker-compose logs -f airplay
+
+# Test with different settings
+AIRPLAY_NAME="Test Speaker" TURN_OFF_DELAY=5 docker-compose up
 ```
 
 ### Customization Ideas
 
-- **Add multiple GPIO outputs** for different devices
-- **Implement web interface** for remote control
+- **Add multiple GPIO outputs** for different devices (zone control)
+- **Implement web interface** for remote control via Balena dashboard
 - **Add motion sensor integration** for auto-power management
-- **Create custom AirPlay device name** in `shairport-sync.conf`
-- **Add LCD/OLED display** to show currently playing track
+- **Add LCD/OLED display** to show currently playing track and volume
+- **Integrate with Home Assistant** via MQTT
+- **Add LED status indicators** for relay state
 
 ## Contributing
 

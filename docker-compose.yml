@@ -8,13 +8,31 @@ services:
     volumes:
       - airplay-metadata:/tmp
     environment:
-      - TURN_OFF_DELAY=10  # Delay in seconds before turning off relay after playback stops
+      # GPIO Configuration
+      - GPIO_PIN=17                    # GPIO pin number (BCM numbering)
+      - GPIO_ACTIVE_STATE=1            # 1=HIGH to turn on relay, 0=LOW to turn on relay
+      - TURN_OFF_DELAY=10              # Delay in seconds before turning off relay after playback stops
+
+      # AirPlay Configuration
+      - AIRPLAY_NAME=AirPlay Relay     # Name shown in AirPlay device list
+      - AIRPLAY_PASSWORD=              # Optional: Set a password for AirPlay access (leave empty for no password)
+
+      # Audio Configuration
+      - AUDIO_BACKEND=alsa             # Audio backend: alsa, pulse, or pipe
+      - AUDIO_DEVICE=default           # ALSA device name (use 'aplay -L' to list devices)
+      - ENABLE_VOLUME_CONTROL=yes      # Enable software volume control (yes/no)
+      - VOLUME_RANGE=60                # Software volume control range in dB (30-60 recommended)
+
+      # Advanced Configuration
+      - INTERPOLATION=soxr             # Audio interpolation: basic, soxr (better quality)
+      - METADATA_PIPE=/tmp/shairport-sync-metadata  # Path to metadata pipe
+
+      # System Configuration
       - DBUS_SYSTEM_BUS_ADDRESS=unix:path=/host/run/dbus/system_bus_socket
     labels:
       io.balena.features.dbus: '1'
       io.balena.features.supervisor-api: '1'
-    command: >
-      bash -c "shairport-sync -c /app/shairport-sync.conf & sleep 2 && /app/gpio_relay_airplay.sh"
+    command: /app/start.sh
 
 volumes:
   airplay-metadata:
