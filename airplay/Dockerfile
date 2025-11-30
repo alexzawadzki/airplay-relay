@@ -32,12 +32,12 @@ RUN git clone https://github.com/mikebrady/shairport-sync.git && \
     cd .. && rm -rf shairport-sync
 
 # Copy application files
+COPY start.sh /app/
 COPY gpio_relay_airplay.sh /app/
-COPY shairport-sync.conf /app/
 
-RUN chmod +x /app/gpio_relay_airplay.sh
+RUN chmod +x /app/start.sh /app/gpio_relay_airplay.sh
 
 # Start avahi-daemon for mDNS/Bonjour discovery
 RUN mkdir -p /var/run/dbus
 
-CMD ["shairport-sync"]
+CMD ["/app/start.sh"]
