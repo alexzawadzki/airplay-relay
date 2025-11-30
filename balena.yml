@@ -1,0 +1,20 @@
+name: AirPlay Relay Controller
+type: sw.application
+description: >-
+  AirPlay receiver with GPIO relay control for Raspberry Pi.
+  Automatically turns on/off amplifiers via relay when AirPlay streaming starts/stops.
+version: 1.0.0
+assets:
+  repository:
+    type: blob.asset
+    data:
+      url: 'https://github.com/alexzawadzki/airplay-relay'
+data:
+  applicationEnvironmentVariables:
+    - TURN_OFF_DELAY: 10
+  defaultDeviceType: raspberrypi3
+  supportedDeviceTypes:
+    - raspberrypi3
+    - raspberrypi4-64
+    - raspberrypi3-64
+    - raspberrypi400-64

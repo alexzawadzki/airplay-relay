@@ -4,8 +4,15 @@ services:
     build: ./airplay
     restart: always
     privileged: true
+    network_mode: host
     volumes:
       - airplay-metadata:/tmp
+    environment:
+      - TURN_OFF_DELAY=10  # Delay in seconds before turning off relay after playback stops
+      - DBUS_SYSTEM_BUS_ADDRESS=unix:path=/host/run/dbus/system_bus_socket
+    labels:
+      io.balena.features.dbus: '1'
+      io.balena.features.supervisor-api: '1'
     command: >
       bash -c "shairport-sync -c /app/shairport-sync.conf & sleep 2 && /app/gpio_relay_airplay.sh"
 
