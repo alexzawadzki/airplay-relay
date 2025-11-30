@@ -6,6 +6,8 @@ services:
     privileged: true
     volumes:
       - airplay-metadata:/tmp
+    environment:
+      - TURN_OFF_DELAY=10  # Delay in seconds before turning off relay after playback stops
     command: >
       bash -c "shairport-sync -c /app/shairport-sync.conf & sleep 2 && /app/gpio_relay_airplay.sh"
 
