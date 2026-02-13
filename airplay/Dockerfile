@@ -27,7 +27,7 @@ RUN install_packages \
 RUN git clone https://github.com/mikebrady/shairport-sync.git && \
     cd shairport-sync && \
     autoreconf -i -f && \
-    ./configure --sysconfdir=/etc --with-alsa --with-avahi --with-metadata --with-soxr --with-pipe --with-systemd --with-libdaemon && \
+    ./configure --sysconfdir=/etc --with-alsa --with-avahi --with-ssl=openssl --with-metadata --with-soxr --with-pipe --with-systemd --with-libdaemon && \
     make && make install && \
     cd .. && rm -rf shairport-sync
 
