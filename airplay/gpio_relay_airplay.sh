@@ -23,9 +23,24 @@ echo "Metadata Pipe: $METADATA_PIPE"
 echo "========================================="
 echo ""
 
-# Setup GPIO
-gpio -g mode $GPIO_PIN out
-gpio -g write $GPIO_PIN $GPIO_INACTIVE_STATE
+# GPIO helper functions using raspi-gpio (replaces deprecated wiringpi)
+gpio_setup() {
+    raspi-gpio set $GPIO_PIN op
+}
+
+gpio_write() {
+    local pin=$1
+    local value=$2
+    if [ "$value" = "1" ]; then
+        raspi-gpio set $pin dh
+    else
+        raspi-gpio set $pin dl
+    fi
+}
+
+# Setup GPIO pin as output and set to inactive state
+gpio_setup
+gpio_write $GPIO_PIN $GPIO_INACTIVE_STATE
 
 # Variable to track shutdown timer PID
 SHUTDOWN_PID=""
@@ -35,7 +50,12 @@ schedule_turn_off() {
     (
         sleep $TURN_OFF_DELAY
         echo "AirPlay STOPPED (after ${TURN_OFF_DELAY}s delay)"
-        gpio -g write $GPIO_PIN $GPIO_INACTIVE_STATE
+        raspi-gpio set $GPIO_PIN dl
+        if [ "$GPIO_INACTIVE_STATE" = "1" ]; then
+            raspi-gpio set $GPIO_PIN dh
+        else
+            raspi-gpio set $GPIO_PIN dl
+        fi
     ) &
     SHUTDOWN_PID=$!
 }
@@ -44,6 +64,7 @@ schedule_turn_off() {
 cancel_turn_off() {
     if [ -n "$SHUTDOWN_PID" ] && kill -0 $SHUTDOWN_PID 2>/dev/null; then
         kill $SHUTDOWN_PID 2>/dev/null
+        wait $SHUTDOWN_PID 2>/dev/null
         SHUTDOWN_PID=""
         echo "Turn-off cancelled (music resumed)"
     fi
@@ -52,15 +73,18 @@ cancel_turn_off() {
 echo "Monitoring AirPlay events..."
 echo ""
 
-# Monitor metadata
-tail -F "$METADATA_PIPE" | while read -r line; do
+# IMPORTANT: Use process substitution instead of a pipe so that the while loop
+# runs in the current shell. A pipeline like `tail -F ... | while read` runs
+# the loop body in a subshell, which means SHUTDOWN_PID is never visible
+# between iterations and cancel_turn_off can never work.
+while read -r line; do
     if echo "$line" | grep -q "pbeg"; then
         cancel_turn_off
         echo "[$(date '+%Y-%m-%d %H:%M:%S')] AirPlay STARTED - Relay ON"
-        gpio -g write $GPIO_PIN $GPIO_ACTIVE_STATE
+        gpio_write $GPIO_PIN $GPIO_ACTIVE_STATE
     elif echo "$line" | grep -q "pend"; then
         echo "[$(date '+%Y-%m-%d %H:%M:%S')] AirPlay playback ended, scheduling turn-off in ${TURN_OFF_DELAY}s..."
-        cancel_turn_off  # Cancel any existing timer
+        cancel_turn_off  # Cancel any existing timer before scheduling a new one
         schedule_turn_off
     fi
-done
+done < <(tail -F "$METADATA_PIPE")

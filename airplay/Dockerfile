@@ -20,7 +20,7 @@ RUN install_packages \
     libssl-dev \
     libsoxr-dev \
     libglib2.0-dev \
-    wiringpi \
+    raspi-gpio \
     dbus
 
 # Build and install shairport-sync
