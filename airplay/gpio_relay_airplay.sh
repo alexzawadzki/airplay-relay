@@ -16,75 +16,75 @@ fi
 echo "========================================="
 echo "GPIO Relay Configuration"
 echo "========================================="
-echo "GPIO Pin: $GPIO_PIN (BCM)"
-echo "Active State: $GPIO_ACTIVE_STATE ($([ "$GPIO_ACTIVE_STATE" = "1" ] && echo "HIGH" || echo "LOW"))"
-echo "Turn-off Delay: ${TURN_OFF_DELAY}s"
-echo "Metadata Pipe: $METADATA_PIPE"
+echo "GPIO Pin:        $GPIO_PIN (BCM)"
+echo "Active State:    $GPIO_ACTIVE_STATE ($([ "$GPIO_ACTIVE_STATE" = "1" ] && echo "HIGH" || echo "LOW"))"
+echo "Turn-off Delay:  ${TURN_OFF_DELAY}s"
+echo "Metadata Pipe:   $METADATA_PIPE"
 echo "========================================="
 echo ""
 
 # GPIO helper functions using raspi-gpio (replaces deprecated wiringpi)
 gpio_setup() {
-    raspi-gpio set $GPIO_PIN op
+    raspi-gpio set "$GPIO_PIN" op
 }
 
 gpio_write() {
     local pin=$1
     local value=$2
     if [ "$value" = "1" ]; then
-        raspi-gpio set $pin dh
+        raspi-gpio set "$pin" dh
     else
-        raspi-gpio set $pin dl
+        raspi-gpio set "$pin" dl
     fi
 }
 
 # Setup GPIO pin as output and set to inactive state
 gpio_setup
-gpio_write $GPIO_PIN $GPIO_INACTIVE_STATE
+gpio_write "$GPIO_PIN" "$GPIO_INACTIVE_STATE"
 
-# Variable to track shutdown timer PID
+# PID of any pending turn-off timer
 SHUTDOWN_PID=""
 
-# Function to turn off GPIO after delay
+# Schedule relay turn-off after TURN_OFF_DELAY seconds
 schedule_turn_off() {
     (
-        sleep $TURN_OFF_DELAY
-        echo "AirPlay STOPPED (after ${TURN_OFF_DELAY}s delay)"
-        raspi-gpio set $GPIO_PIN dl
-        if [ "$GPIO_INACTIVE_STATE" = "1" ]; then
-            raspi-gpio set $GPIO_PIN dh
-        else
-            raspi-gpio set $GPIO_PIN dl
-        fi
+        sleep "$TURN_OFF_DELAY"
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] AirPlay STOPPED (after ${TURN_OFF_DELAY}s delay)"
+        gpio_write "$GPIO_PIN" "$GPIO_INACTIVE_STATE"
     ) &
     SHUTDOWN_PID=$!
 }
 
-# Function to cancel scheduled turn off
+# Cancel any pending turn-off timer
 cancel_turn_off() {
-    if [ -n "$SHUTDOWN_PID" ] && kill -0 $SHUTDOWN_PID 2>/dev/null; then
-        kill $SHUTDOWN_PID 2>/dev/null
-        wait $SHUTDOWN_PID 2>/dev/null
+    if [ -n "$SHUTDOWN_PID" ] && kill -0 "$SHUTDOWN_PID" 2>/dev/null; then
+        kill "$SHUTDOWN_PID" 2>/dev/null
+        wait "$SHUTDOWN_PID" 2>/dev/null
         SHUTDOWN_PID=""
-        echo "Turn-off cancelled (music resumed)"
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] Turn-off cancelled (music resumed)"
     fi
 }
 
 echo "Monitoring AirPlay events..."
 echo ""
 
-# IMPORTANT: Use process substitution instead of a pipe so that the while loop
-# runs in the current shell. A pipeline like `tail -F ... | while read` runs
-# the loop body in a subshell, which means SHUTDOWN_PID is never visible
-# between iterations and cancel_turn_off can never work.
-while read -r line; do
-    if echo "$line" | grep -q "pbeg"; then
-        cancel_turn_off
-        echo "[$(date '+%Y-%m-%d %H:%M:%S')] AirPlay STARTED - Relay ON"
-        gpio_write $GPIO_PIN $GPIO_ACTIVE_STATE
-    elif echo "$line" | grep -q "pend"; then
-        echo "[$(date '+%Y-%m-%d %H:%M:%S')] AirPlay playback ended, scheduling turn-off in ${TURN_OFF_DELAY}s..."
-        cancel_turn_off  # Cancel any existing timer before scheduling a new one
-        schedule_turn_off
-    fi
-done < <(tail -F "$METADATA_PIPE")
+# Read from the FIFO in the current shell so SHUTDOWN_PID is visible across
+# iterations.  A named pipe (FIFO) returns EOF when the writer closes it, so
+# we wrap the inner read loop in an outer 'while true' that simply reopens the
+# FIFO.  This is more reliable than 'tail -F' which is designed for regular
+# files, not FIFOs.
+while true; do
+    while IFS= read -r line; do
+        if echo "$line" | grep -q "pbeg"; then
+            cancel_turn_off
+            echo "[$(date '+%Y-%m-%d %H:%M:%S')] AirPlay STARTED - Relay ON"
+            gpio_write "$GPIO_PIN" "$GPIO_ACTIVE_STATE"
+        elif echo "$line" | grep -q "pend"; then
+            echo "[$(date '+%Y-%m-%d %H:%M:%S')] AirPlay playback ended, scheduling turn-off in ${TURN_OFF_DELAY}s..."
+            cancel_turn_off
+            schedule_turn_off
+        fi
+    done < "$METADATA_PIPE"
+    # FIFO writer closed; pause briefly before reopening
+    sleep 0.2
+done

@@ -1,20 +1,17 @@
 FROM balenalib/raspberrypi3-debian:bullseye-run
 
-# Enable systemd init system for Balena
 ENV INITSYSTEM on
 
-# Install dependencies
+# Install build dependencies and runtime packages
 RUN install_packages \
     git \
     build-essential \
     autoconf \
     automake \
     libtool \
-    libdaemon-dev \
     libpopt-dev \
     libconfig-dev \
     libasound2-dev \
-    libpulse-dev \
     avahi-daemon \
     libavahi-client-dev \
     libssl-dev \
@@ -23,21 +20,29 @@ RUN install_packages \
     raspi-gpio \
     dbus
 
-# Build and install shairport-sync
-RUN git clone https://github.com/mikebrady/shairport-sync.git && \
+# Pin shairport-sync to a specific release for reproducible builds.
+# v4.x dropped --with-libdaemon and --with-systemd; do not add them back.
+ARG SPS_VERSION=4.3.2
+RUN git clone --depth 1 --branch ${SPS_VERSION} \
+        https://github.com/mikebrady/shairport-sync.git && \
     cd shairport-sync && \
     autoreconf -i -f && \
-    ./configure --sysconfdir=/etc --with-alsa --with-avahi --with-ssl=openssl --with-metadata --with-soxr --with-pipe --with-systemd --with-libdaemon && \
-    make && make install && \
+    ./configure \
+        --sysconfdir=/etc \
+        --with-alsa \
+        --with-avahi \
+        --with-ssl=openssl \
+        --with-metadata \
+        --with-soxr \
+        --with-pipe && \
+    make -j$(nproc) && \
+    make install && \
     cd .. && rm -rf shairport-sync
 
-# Copy application files
 COPY start.sh /app/
 COPY gpio_relay_airplay.sh /app/
-
 RUN chmod +x /app/start.sh /app/gpio_relay_airplay.sh
 
-# Start avahi-daemon for mDNS/Bonjour discovery
 RUN mkdir -p /var/run/dbus
 
 CMD ["/app/start.sh"]
