@@ -1,7 +1,9 @@
 #!/bin/bash
 set -e
 
-# Environment variable defaults
+# ===============================
+# Environment defaults
+# ===============================
 AIRPLAY_NAME="${AIRPLAY_NAME:-AirPlay Relay}"
 AIRPLAY_PASSWORD="${AIRPLAY_PASSWORD:-}"
 AUDIO_BACKEND="${AUDIO_BACKEND:-alsa}"
@@ -23,7 +25,9 @@ echo "Interpolation:  $INTERPOLATION"
 echo "Metadata Pipe:  $METADATA_PIPE"
 echo "========================================="
 
-# Generate shairport-sync configuration
+# ===============================
+# Generate shairport-sync config
+# ===============================
 cat > /etc/shairport-sync.conf <<EOF
 general = {
   name = "$AIRPLAY_NAME";
@@ -31,9 +35,8 @@ general = {
   output_backend = "$AUDIO_BACKEND";
 EOF
 
-# Append optional password
 if [ -n "$AIRPLAY_PASSWORD" ]; then
-  cat >> /etc/shairport-sync.conf <<EOF
+cat >> /etc/shairport-sync.conf <<EOF
   password = "$AIRPLAY_PASSWORD";
 EOF
   echo "Password protection: ENABLED"
@@ -54,9 +57,8 @@ metadata = {
 };
 EOF
 
-# Append alsa block with or without volume control
 if [ "$ENABLE_VOLUME_CONTROL" = "yes" ]; then
-  cat >> /etc/shairport-sync.conf <<EOF
+cat >> /etc/shairport-sync.conf <<EOF
 
 alsa = {
   output_device = "$AUDIO_DEVICE";
@@ -65,9 +67,9 @@ alsa = {
   volume_range_db = $VOLUME_RANGE;
 };
 EOF
-  echo "Volume control: ENABLED (range: ${VOLUME_RANGE}dB)"
+  echo "Volume control: ENABLED"
 else
-  cat >> /etc/shairport-sync.conf <<EOF
+cat >> /etc/shairport-sync.conf <<EOF
 
 alsa = {
   output_device = "$AUDIO_DEVICE";
@@ -80,28 +82,38 @@ echo ""
 echo "Starting services..."
 echo "========================================="
 
-# Start D-Bus (required by Avahi)
-mkdir -p /var/run/dbus
-dbus-daemon --system --fork || true
+# ===============================
+# Fix runtime directories
+# ===============================
+rm -f /run/dbus/pid
+rm -f /run/avahi-daemon/pid
 
-# Start Avahi daemon for mDNS/Bonjour discovery
+mkdir -p /run/dbus
+mkdir -p /run/avahi-daemon
+
+# Ensure dbus UUID exists
+dbus-uuidgen --ensure
+
+# ===============================
+# Start system services
+# ===============================
+echo "Starting dbus..."
+dbus-daemon --system --fork
+
+sleep 2
+
+echo "Starting avahi..."
 avahi-daemon --daemonize --no-chroot
 
-# Start shairport-sync in background
-shairport-sync -c /etc/shairport-sync.conf &
+sleep 2
 
-# Wait for shairport-sync to create the metadata pipe (up to 30 s)
-echo "Waiting for metadata pipe to be ready..."
-PIPE_WAIT=0
-while [ ! -p "$METADATA_PIPE" ]; do
-  sleep 1
-  PIPE_WAIT=$((PIPE_WAIT + 1))
-  if [ "$PIPE_WAIT" -ge 30 ]; then
-    echo "ERROR: Metadata pipe $METADATA_PIPE did not appear after 30 seconds."
-    exit 1
-  fi
-done
-echo "Metadata pipe ready."
+# ===============================
+# Start GPIO monitor in background
+# ===============================
+/app/gpio_relay_airplay.sh &
 
-# Hand off to GPIO relay monitor (exec replaces this process)
-exec /app/gpio_relay_airplay.sh
+# ===============================
+# Start shairport in foreground
+# ===============================
+echo "Starting shairport-sync..."
+exec shairport-sync -c /etc/shairport-sync.conf -v
