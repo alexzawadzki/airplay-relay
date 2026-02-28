@@ -105,7 +105,7 @@ sleep 2
 echo "Starting avahi..."
 avahi-daemon --daemonize --no-chroot || true
 
-sleep 2
+sleep 5
 
 # ===============================
 # Pre-create metadata FIFO so the GPIO monitor can open it
