@@ -98,14 +98,23 @@ dbus-uuidgen --ensure
 # Start system services
 # ===============================
 echo "Starting dbus..."
-dbus-daemon --system --fork
+dbus-daemon --system --fork || true
 
 sleep 2
 
 echo "Starting avahi..."
-avahi-daemon --daemonize --no-chroot
+avahi-daemon --daemonize --no-chroot || true
 
 sleep 2
+
+# ===============================
+# Pre-create metadata FIFO so the GPIO monitor can open it
+# immediately (shairport-sync will reuse it once running)
+# ===============================
+if [ ! -p "$METADATA_PIPE" ]; then
+    mkfifo -m 622 "$METADATA_PIPE"
+    echo "Created metadata pipe: $METADATA_PIPE"
+fi
 
 # ===============================
 # Start GPIO monitor in background
