@@ -1,5 +1,7 @@
 # AirPlay Relay Controller
 
+[![Deploy to Balena](https://github.com/alexzawadzki/airplay-relay/actions/workflows/deploy-balena.yml/badge.svg)](https://github.com/alexzawadzki/airplay-relay/actions/workflows/deploy-balena.yml)
+
 Turn your Raspberry Pi into an AirPlay receiver with automatic GPIO relay control for amplifiers and audio equipment.
 
 ## Overview
@@ -92,6 +94,17 @@ NO   ─────> AC Hot Out to Amplifier
    ```bash
    npm install -g balena-cli
    ```
+
+#### GitHub Actions Auto-Deploy (Optional)
+
+To enable automatic Balena deployment on every push to `main`:
+
+1. Get your Balena API token from [Balena Dashboard → Account Settings → Access Tokens](https://dashboard.balena-cloud.com/preferences/access-tokens)
+2. Add it as a GitHub repository secret named `BALENA_TOKEN`:
+   - Go to your repository → Settings → Secrets and variables → Actions
+   - Click "New repository secret"
+   - Name: `BALENA_TOKEN`, Value: your Balena API token
+3. Push to `main` — the action will automatically build and deploy to your fleet
 
 #### Deploy Steps
 
