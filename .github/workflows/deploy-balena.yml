@@ -17,5 +17,5 @@ jobs:
         id: deploy
         with:
           balena_token: ${{ secrets.BALENA_TOKEN }}
-          fleet: alexzawadzki/airplay-relay
+          fleet: g_alex_zawadzki/balena-sound
           source: .
