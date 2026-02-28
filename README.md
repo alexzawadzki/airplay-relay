@@ -121,7 +121,7 @@ To enable automatic Balena deployment on every push to `main`:
 
 3. **Create a new application**
    ```bash
-   balena app create airplay-relay --type raspberrypi3
+   balena app create balena-sound --type raspberrypi3
    ```
 
    For Raspberry Pi 4, use `--type raspberrypi4-64`
@@ -135,7 +135,7 @@ To enable automatic Balena deployment on every push to `main`:
 
 5. **Deploy the code**
    ```bash
-   balena push airplay-relay
+   balena push balena-sound
    ```
 
 6. **Insert SD card into Raspberry Pi and power on**
