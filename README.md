@@ -357,13 +357,12 @@ network_mode: host
 
 **Check GPIO permissions:**
 ```bash
-gpio -g mode 17 out
-gpio -g read 17  # Should show 0 or 1
+raspi-gpio get 17
 ```
 
-**Verify WiringPi installation:**
+**Verify raspi-gpio installation:**
 ```bash
-gpio -v
+raspi-gpio help
 ```
 
 **Check logs for errors:**
@@ -479,7 +478,7 @@ Contributions welcome! Please:
 
 This project uses:
 - **Shairport Sync**: [MIT License](https://github.com/mikebrady/shairport-sync/blob/master/LICENSES)
-- **WiringPi**: [LGPL v3](http://wiringpi.com/)
+- **raspi-gpio**: Part of the Raspberry Pi OS toolchain
 
 ## Credits
 
