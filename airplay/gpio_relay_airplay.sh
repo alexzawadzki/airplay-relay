@@ -75,11 +75,13 @@ echo ""
 # files, not FIFOs.
 while true; do
     while IFS= read -r line; do
-        if echo "$line" | grep -q "pbeg"; then
+        # shairport-sync encodes 4-byte codes as hex in its XML metadata pipe.
+        # "pbeg" = 70626567, "pend" = 70656e64 — grep for the hex strings, not ASCII.
+        if echo "$line" | grep -q "70626567"; then
             cancel_turn_off
             echo "[$(date '+%Y-%m-%d %H:%M:%S')] AirPlay STARTED - Relay ON"
             gpio_write "$GPIO_PIN" "$GPIO_ACTIVE_STATE"
-        elif echo "$line" | grep -q "pend"; then
+        elif echo "$line" | grep -q "70656e64"; then
             echo "[$(date '+%Y-%m-%d %H:%M:%S')] AirPlay playback ended, scheduling turn-off in ${TURN_OFF_DELAY}s..."
             cancel_turn_off
             schedule_turn_off
