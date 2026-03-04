@@ -330,11 +330,11 @@ docker-compose logs -f airplay
 ## How It Works
 
 1. **Shairport Sync** creates an AirPlay receiver on your network
-2. When playback starts (`pbeg` / hex `70626567` event):
+2. When playback starts, shairport-sync writes a `ssnc`/`pbeg` (play stream begin) message to the metadata pipe
    - Script sets GPIO 17 HIGH
    - Relay activates
    - Amplifier powers on
-3. When playback stops (`pend` / hex `70656e64` event):
+3. When playback stops, shairport-sync writes a `ssnc`/`pend` (play stream end) message
    - Script starts countdown timer
    - If playback resumes before timer expires, countdown cancels
    - If timer expires, GPIO 17 goes LOW
@@ -342,6 +342,26 @@ docker-compose logs -f airplay
    - Amplifier powers off
 
 This prevents the amplifier from rapidly cycling on/off when you pause/resume or skip between songs.
+
+### Metadata Pipe Format
+
+Shairport-sync writes XML messages to `/tmp/shairport-sync-metadata`. Each message contains two 4-byte codes encoded as 8 hex digits:
+
+- **Type**: `ssnc` (73736e63) for shairport-sync events, `core` (636f7265) for iTunes/DAAP metadata
+- **Code**: identifies the specific event (e.g. `pbeg` = 70626567, `pend` = 70656e64)
+
+Relevant `ssnc` event codes:
+
+| Code | Hex | Event |
+|------|-----|-------|
+| `pbeg` | 70626567 | Play stream begin |
+| `pend` | 70656e64 | Play stream end |
+| `prsm` | 7072736d | Play stream resume |
+| `pfls` | 70666c73 | Play stream flush (pause) |
+| `pvol` | 70766f6c | Volume change |
+| `prgr` | 70726772 | Playback progress |
+
+See [shairport-sync-metadata-reader](https://github.com/mikebrady/shairport-sync-metadata-reader) for the full reference.
 
 ## Supported Devices
 
@@ -447,8 +467,8 @@ airplay-relay/
 2. **Avahi daemon** starts for mDNS/Bonjour service discovery
 3. **shairport-sync** starts as AirPlay receiver with generated config
 4. **gpio_relay_airplay.sh** monitors the metadata pipe for playback events
-5. When `pbeg` (hex `70626567`, playback begin) event detected → GPIO goes HIGH → Relay activates
-6. When `pend` (hex `70656e64`, playback end) event detected → Starts countdown timer
+5. When `ssnc`/`pbeg` (play stream begin) event detected → GPIO goes HIGH → Relay activates
+6. When `ssnc`/`pend` (play stream end) event detected → Starts countdown timer
 7. If countdown completes → GPIO goes LOW → Relay deactivates
 8. If playback resumes during countdown → Timer cancels, relay stays active
 
