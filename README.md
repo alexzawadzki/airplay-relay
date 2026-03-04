@@ -330,11 +330,11 @@ docker-compose logs -f airplay
 ## How It Works
 
 1. **Shairport Sync** creates an AirPlay receiver on your network
-2. When playback starts (`pbeg` event):
+2. When playback starts (`pbeg` / hex `70626567` event):
    - Script sets GPIO 17 HIGH
    - Relay activates
    - Amplifier powers on
-3. When playback stops (`pend` event):
+3. When playback stops (`pend` / hex `70656e64` event):
    - Script starts countdown timer
    - If playback resumes before timer expires, countdown cancels
    - If timer expires, GPIO 17 goes LOW
@@ -447,8 +447,8 @@ airplay-relay/
 2. **Avahi daemon** starts for mDNS/Bonjour service discovery
 3. **shairport-sync** starts as AirPlay receiver with generated config
 4. **gpio_relay_airplay.sh** monitors the metadata pipe for playback events
-5. When `pbeg` (playback begin) event detected → GPIO goes HIGH → Relay activates
-6. When `pend` (playback end) event detected → Starts countdown timer
+5. When `pbeg` (hex `70626567`, playback begin) event detected → GPIO goes HIGH → Relay activates
+6. When `pend` (hex `70656e64`, playback end) event detected → Starts countdown timer
 7. If countdown completes → GPIO goes LOW → Relay deactivates
 8. If playback resumes during countdown → Timer cancels, relay stays active
 
